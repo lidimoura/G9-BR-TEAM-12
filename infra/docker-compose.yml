@@ -1,0 +1,94 @@
+version: "3.9"
+
+# EnergiAI — orquestração local dos 3 serviços + banco opcional
+# Suba tudo com: docker compose up --build
+# Suba só um serviço (ex: durante dev do backend): docker compose up backend
+
+services:
+
+  # ---------------------------------------------------------
+  # BACKEND — Java + Spring Boot
+  # Endpoint obrigatório: POST /analise-energetica
+  # ---------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: energiai-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # URL interna do serviço de IA — o backend chama esse endereço, não localhost
+      - MODEL_SERVICE_URL=http://data-science:8000
+      - SPRING_PROFILES_ACTIVE=docker
+      # Credenciais/config do serviço OCI escolhido (preencher quando definido)
+      - OCI_CONFIG_PATH=/run/secrets/oci_config
+    depends_on:
+      - data-science
+    networks:
+      - energiai-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------
+  # DATA SCIENCE — Python (FastAPI expondo o modelo treinado)
+  # Recebe do backend os dados já validados, devolve categoria/probabilidade
+  # ---------------------------------------------------------
+  data-science:
+    build:
+      context: ./data-science
+      dockerfile: Dockerfile
+    container_name: energiai-model-service
+    ports:
+      - "8000:8000"
+    volumes:
+      # modelo serializado (.pkl/.joblib) montado no container
+      - ./data-science/models:/app/models
+    environment:
+      - MODEL_PATH=/app/models/modelo_classificacao.pkl
+    networks:
+      - energiai-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------
+  # FRONTEND — React
+  # ---------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: energiai-frontend
+    ports:
+      - "3000:80"
+    environment:
+      # URL pública do backend, usada pelo app React no navegador
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - energiai-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------
+  # BANCO DE DADOS — opcional (só necessário se implementarem
+  # "Histórico de análises", item opcional do edital)
+  # ---------------------------------------------------------
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: energiai-db
+  #   environment:
+  #     - POSTGRES_DB=energiai
+  #     - POSTGRES_USER=energiai
+  #     - POSTGRES_PASSWORD=changeme
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - energiai-db-data:/var/lib/postgresql/data
+  #   networks:
+  #     - energiai-net
+
+networks:
+  energiai-net:
+    driver: bridge
+
+# volumes:
+#   energiai-db-data:
