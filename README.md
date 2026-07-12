@@ -108,4 +108,4 @@ A preocupação com a eficiência energética e sustentabilidade é uma demanda 
 
 * Antônio Carlos Martins Teixeira | Frontend Developer
 [Github](https://github.com/digichargeac)
-
+[Linkedin](www.linkedin.com/in/antonio-carlos-martins-teixeira)
